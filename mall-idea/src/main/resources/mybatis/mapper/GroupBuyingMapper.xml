@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mall.mapper.GroupBuyingMapper">
+    <!-- 定义结果映射 -->
+    <resultMap id="GroupBuyingResult" type="com.mall.entity.GroupBuying">
+        <id property="id" column="id"/>
+        <result property="productId" column="productId"/>
+        <result property="startTime" column="startTime"/>
+        <result property="endTime" column="endTime"/>
+        <result property="groupPrice" column="groupPrice"/>
+        <result property="requiredNumber" column="requiredNumber"/>
+        <result property="joinedNumber" column="joinedNumber"/>
+        <result property="status" column="status"/>
+        <result property="userId" column="userId"/>
+    </resultMap>
+    <!-- 查询用户是否参与过团购 -->
+    <select id="selectJoinCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM group_member
+        WHERE group_buying_id = #{groupId}
+          AND user_id = #{userId}
+    </select>
+    <!-- 其他查询使用统一的结果映射 -->
+    <select id="findById" resultMap="GroupBuyingResult">
+        SELECT * FROM t_group_buying WHERE id = #{id}
+    </select>
+    <select id="getActiveGroups" resultMap="GroupBuyingResult">
+        SELECT * FROM t_group_buying
+        WHERE status = 0 AND endTime > NOW()
+    </select>
+    <select id="getActiveGroupByProductId" resultMap="GroupBuyingResult">
+        SELECT *
+        FROM t_group_buying
+        WHERE productId = #{productId}
+          AND status = 0
+          AND NOW() BETWEEN startTime AND endTime
+        ORDER BY startTime DESC
+            LIMIT 1
+    </select>
+    <!-- 保持原有的其他查询 -->
+    <select id="checkUserJoined" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM t_group_buying_member
+        WHERE groupBuyingId = #{groupId} AND userId = #{userId}
+    </select>
+    <!-- 插入团购成员 -->
+    <insert id="insertMember" parameterType="com.mall.entity.GroupBuyingMember">
+        INSERT INTO group_member (group_buying_id, user_id, join_time)
+        VALUES (#{groupBuyingId}, #{userId}, #{joinTime})
+    </insert>
+    <!-- 获取团购成员列表 -->
+    <select id="getGroupMembers" resultType="com.mall.entity.GroupBuyingMember">
+        SELECT *
+        FROM group_member
+        WHERE group_buying_id = #{groupId}
+    </select>
+    <select id="isUserJoined" resultType="java.lang.Boolean">
+        SELECT COUNT(*) > 0 FROM t_group_buying_member
+        WHERE groupBuyingId = #{groupId} AND userId = #{userId}
+    </select>
+    <select id="selectMembersByUserId" resultType="java.util.Map">
+        SELECT
+            m.id as memberId,
+            m.joinTime,
+            g.id as groupId,
+            g.productId,
+            g.startTime,
+            g.endTime,
+            g.groupPrice,
+            g.requiredNumber,
+            g.joinedNumber,
+            g.status as groupStatus,
+            p.name as productName,
+            p.proPic as productImage,
+            p.price as originalPrice,
+            o.orderNo,
+            o.status as orderStatus,
+            o.totalPrice
+        FROM t_group_buying_member m
+                 LEFT JOIN t_group_buying g ON m.groupBuyingId = g.id
+                 LEFT JOIN t_product p ON g.productId = p.id
+                 LEFT JOIN t_order o ON CAST(o.groupId AS SIGNED) = g.id AND o.userId = m.userId
+        WHERE m.userId = #{userId}
+        ORDER BY m.joinTime DESC
+    </select>
+    <select id="selectMembersByOpenid" resultType="java.util.Map">
+        SELECT
+            gb.id as groupId,
+            gb.productId,
+            gb.groupPrice,
+            gb.requiredNumber,
+            gb.joinedNumber,
+            gb.status,
+            gb.startTime,
+            gb.endTime,
+            p.name as productName,
+            p.proPic as productImage,
+            gbm.joinTime
+        FROM
+            t_group_buying gb
+                LEFT JOIN t_group_buying_member gbm ON gb.id = gbm.groupBuyingId
+                LEFT JOIN t_product p ON gb.productId = p.id
+        WHERE
+            gbm.userId = #{openid}
+        ORDER BY
+            gbm.joinTime DESC
+    </select>
+</mapper>
